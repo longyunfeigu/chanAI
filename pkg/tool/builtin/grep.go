@@ -3,6 +3,7 @@ package builtin
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 	"os/exec"
 	"time"
@@ -76,8 +77,8 @@ func (t *Grep) Execute(ctx context.Context, input map[string]any, tc *tool.ToolC
 		args = append(args, "-g", glob)
 	}
 
-	if ctxLines, ok := input["context_lines"].(float64); ok && ctxLines > 0 {
-		args = append(args, "-C", fmt.Sprintf("%d", int(ctxLines)))
+	if ctxLines, ok := normalizeInt(input["context_lines"]); ok && ctxLines > 0 {
+		args = append(args, "-C", fmt.Sprintf("%d", ctxLines))
 	}
 
 	// Pattern comes last (mostly), then path
@@ -91,9 +92,9 @@ func (t *Grep) Execute(ctx context.Context, input map[string]any, tc *tool.ToolC
 	cmd.Stderr = &stderr
 
 	err := cmd.Run()
-	
+
 	output := stdout.String()
-	
+
 	// Handle "no match" (rg returns 1) vs "error" (rg returns > 1)
 	if err != nil {
 		if exitErr, ok := err.(*exec.ExitError); ok {
@@ -116,4 +117,21 @@ func (t *Grep) Execute(ctx context.Context, input map[string]any, tc *tool.ToolC
 	}
 
 	return output, nil
+}
+
+// normalizeInt attempts to coerce common JSON-friendly numeric types to int.
+func normalizeInt(v any) (int, bool) {
+	switch n := v.(type) {
+	case int:
+		return n, true
+	case int64:
+		return int(n), true
+	case float64:
+		return int(n), true
+	case json.Number:
+		if i, err := n.Int64(); err == nil {
+			return int(i), true
+		}
+	}
+	return 0, false
 }

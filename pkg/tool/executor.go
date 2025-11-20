@@ -2,8 +2,9 @@ package tool
 
 import (
 	"context"
-	_ "fmt"
+	"fmt"
 	"math"
+	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -46,13 +47,14 @@ type ExecuteRequest struct {
 
 // ExecuteResult captures the output of a tool invocation.
 type ExecuteResult struct {
-	Success    bool
-	Output     any
-	Error      error
-	Duration   time.Duration
-	StartedAt  time.Time
-	FinishedAt time.Time
-	Attempts   int
+	Success     bool
+	Output      any
+	Error       error
+	Duration    time.Duration
+	StartedAt   time.Time
+	FinishedAt  time.Time
+	Attempts    int
+	LongRunning bool
 }
 
 // Execute runs one tool with observability, timeout, and retry logic.
@@ -74,8 +76,10 @@ func (e *Executor) Execute(ctx context.Context, req *ExecuteRequest) *ExecuteRes
 
 	// 3. Determine config (Timeout, Retry)
 	var (
-		timeout     = e.config.DefaultTimeout
-		retryPolicy *RetryPolicy
+		timeout          = e.config.DefaultTimeout
+		retryPolicy      *RetryPolicy
+		longRunning      bool
+		requiresApproval bool
 	)
 
 	if et, ok := req.Tool.(EnhancedTool); ok {
@@ -83,11 +87,30 @@ func (e *Executor) Execute(ctx context.Context, req *ExecuteRequest) *ExecuteRes
 			timeout = t
 		}
 		retryPolicy = et.RetryPolicy()
+		longRunning = et.IsLongRunning()
+		requiresApproval = et.RequiresApproval()
+		// Long running tools often manage their own lifecycle; relax timeout if unset.
+		if longRunning && et.Timeout() == 0 && req.TimeoutOverride == 0 {
+			timeout = 0
+		}
 	}
 
 	// Request override takes precedence
 	if req.TimeoutOverride > 0 {
 		timeout = req.TimeoutOverride
+	}
+
+	if requiresApproval && !approved(req.Context) {
+		err := fmt.Errorf("tool %s requires approval before execution", req.Tool.Name())
+		end := time.Now()
+		return &ExecuteResult{
+			Success:    false,
+			Error:      err,
+			StartedAt:  start,
+			FinishedAt: end,
+			Duration:   end.Sub(start),
+			Attempts:   0,
+		}
 	}
 
 	// 4. Execution Loop
@@ -106,10 +129,16 @@ func (e *Executor) Execute(ctx context.Context, req *ExecuteRequest) *ExecuteRes
 		attempts = attempt + 1
 
 		// Create attempt context
-		execCtx, cancel := context.WithTimeout(ctx, timeout)
+		execCtx := ctx
+		var cancel context.CancelFunc
+		if timeout > 0 {
+			execCtx, cancel = context.WithTimeout(ctx, timeout)
+		}
 
 		output, execErr = req.Tool.Execute(execCtx, req.Input, req.Context)
-		cancel()
+		if cancel != nil {
+			cancel()
+		}
 
 		if execErr == nil {
 			break // Success
@@ -137,13 +166,14 @@ func (e *Executor) Execute(ctx context.Context, req *ExecuteRequest) *ExecuteRes
 Finish:
 	end := time.Now()
 	return &ExecuteResult{
-		Success:    execErr == nil,
-		Output:     output,
-		Error:      execErr,
-		StartedAt:  start,
-		FinishedAt: end,
-		Duration:   end.Sub(start),
-		Attempts:   attempts,
+		Success:     execErr == nil,
+		Output:      output,
+		Error:       execErr,
+		StartedAt:   start,
+		FinishedAt:  end,
+		Duration:    end.Sub(start),
+		Attempts:    attempts,
+		LongRunning: longRunning,
 	}
 }
 
@@ -153,14 +183,33 @@ func (e *Executor) ExecuteBatch(ctx context.Context, requests []*ExecuteRequest)
 	if len(requests) == 0 {
 		return results
 	}
-	var wg sync.WaitGroup
-	wg.Add(len(requests))
+	type prioritized struct {
+		idx      int
+		req      *ExecuteRequest
+		priority int
+	}
 
+	items := make([]prioritized, 0, len(requests))
 	for i, req := range requests {
-		i, req := i, req
+		p := 0
+		if et, ok := req.Tool.(EnhancedTool); ok {
+			p = et.Priority()
+		}
+		items = append(items, prioritized{idx: i, req: req, priority: p})
+	}
+
+	sort.SliceStable(items, func(i, j int) bool {
+		return items[i].priority > items[j].priority
+	})
+
+	var wg sync.WaitGroup
+	wg.Add(len(items))
+
+	for _, item := range items {
+		item := item
 		go func() {
 			defer wg.Done()
-			results[i] = e.Execute(ctx, req)
+			results[item.idx] = e.Execute(ctx, item.req)
 		}()
 	}
 
@@ -190,4 +239,14 @@ func calculateBackoff(attempt int, policy *RetryPolicy) time.Duration {
 		backoff = float64(policy.MaxBackoff)
 	}
 	return time.Duration(backoff)
+}
+
+func approved(tc *ToolContext) bool {
+	if tc == nil {
+		return false
+	}
+	if v, ok := tc.Metadata["approved"].(bool); ok {
+		return v
+	}
+	return false
 }

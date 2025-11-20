@@ -121,21 +121,29 @@ func (a *Agent) RunStream(ctx context.Context, input string, onDelta func(string
 }
 
 // UseTool allows manual tool invocation; typical planners can wrap this.
-func (a *Agent) UseTool(ctx context.Context, name, input string) (string, error) {
+// The input map should satisfy the tool's schema.
+func (a *Agent) UseTool(ctx context.Context, name string, input map[string]any) (any, error) {
 	t, ok := a.toolIndex[name]
 	if !ok {
-		return "", fmt.Errorf("tool %q not found", name)
+		return nil, fmt.Errorf("tool %q not found", name)
 	}
-	res, err := t.Run(ctx, input)
+
+	if err := tool.ValidateInput(t, input); err != nil {
+		return nil, err
+	}
+
+	// Minimal tool context; callers can extend as needed.
+	tc := tool.NewToolContext()
+	res, err := t.Execute(ctx, input, tc)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 	// Note: UseTool in this simple agent just records the execution,
 	// it doesn't necessarily feed it back to the LLM unless part of a Run loop.
 	// We'll update this in Phase 4 (ReAct Loop).
 	a.memory.Add(types.Message{
 		Role:    types.RoleTool,
-		Content: res,
+		Content: fmt.Sprintf("%v", res),
 	})
 	return res, nil
 }

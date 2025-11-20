@@ -42,7 +42,7 @@ func TestGlob_Execute(t *testing.T) {
 				"pattern":  "**/*",
 				"root_dir": tmpDir,
 			},
-			// a.txt, sub, sub/b.go, sub/c.js = 4 entries? 
+			// a.txt, sub, sub/b.go, sub/c.js = 4 entries?
 			// Doublestar glob behavior: **/* matches files and dirs usually.
 			// Let's just check if it finds the files we expect.
 			wantCnt: 3, // expecting at least 3 files (directories might be included depending on impl)
@@ -73,24 +73,24 @@ func TestGlob_Execute(t *testing.T) {
 				t.Fatalf("Execute() error = %v", err)
 			}
 
-			files, ok := got.([]string)
+			res, ok := got.(*GlobResult)
 			if !ok {
-				t.Fatalf("Result not []string")
+				t.Fatalf("Result not *GlobResult")
 			}
 
 			// Simple count check, actual glob behavior can be tricky with dirs
 			// We filter for files only in our check if we wanted to be strict
 			count := 0
-			for _, f := range files {
+			for _, f := range res.Matches {
 				info, err := os.Stat(f)
 				if err == nil && !info.IsDir() {
 					count++
 				}
 			}
-			
+
 			// Allow some flexibility if dirs are included in raw glob
 			if count < tt.wantCnt {
-				t.Errorf("Found %d files, want at least %d. Matches: %v", count, tt.wantCnt, files)
+				t.Errorf("Found %d files, want at least %d. Matches: %v", count, tt.wantCnt, res.Matches)
 			}
 		})
 	}

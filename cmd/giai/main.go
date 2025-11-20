@@ -21,11 +21,17 @@ func main() {
 	llm := initProvider()
 
 	tools := []tool.Tool{
-		tool.NewFunc("clock", "Returns the current UTC time", func(ctx context.Context, input string) (string, error) {
+		tool.NewFunc("clock", "Returns the current UTC time", func(ctx context.Context, input map[string]any, tc *tool.ToolContext) (any, error) {
 			return time.Now().UTC().Format(time.RFC3339), nil
+		}).WithSchema(map[string]any{
+			"type":       "object",
+			"properties": map[string]any{},
 		}),
-		tool.NewFunc("echo", "Echo back the provided input", func(ctx context.Context, input string) (string, error) {
-			return input, nil
+		tool.NewFunc("echo", "Echo back the provided input", func(ctx context.Context, input map[string]any, tc *tool.ToolContext) (any, error) {
+			if v, ok := input["input"].(string); ok {
+				return v, nil
+			}
+			return "", fmt.Errorf("input must be a string")
 		}),
 	}
 
@@ -39,7 +45,7 @@ func main() {
 
 	userInput := "Hello, introduce yourself."
 	fmt.Printf("User: %s\n", userInput)
-	
+
 	// Test Streaming
 	fmt.Print("Agent: ")
 	_, err = ag.RunStream(ctx, userInput, func(delta string) {

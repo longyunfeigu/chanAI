@@ -3,6 +3,7 @@ package builtin
 import (
 	"context"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"testing"
 
@@ -11,12 +12,8 @@ import (
 
 func TestGrep_Execute(t *testing.T) {
 	// We need 'rg' installed for this test. If not present, we skip.
-	if _, err := os.Stat("/usr/bin/rg"); os.IsNotExist(err) {
-		// Try checking path
-		path, _ := os.LookupEnv("PATH")
-		if !hasCommand("rg", path) {
-			t.Skip("ripgrep (rg) not found, skipping test")
-		}
+	if _, err := exec.LookPath("rg"); err != nil {
+		t.Skip("ripgrep (rg) not found, skipping test")
 	}
 
 	tmpDir, err := os.MkdirTemp("", "grep_test")
@@ -47,7 +44,7 @@ func TestGrep_Execute(t *testing.T) {
 				"pattern": "Hello",
 				"path":    tmpDir,
 			},
-			wantStr: "hello.txt:1:Hello World\nhello.txt:3:Hello Universe", 
+			wantStr: "hello.txt:1:Hello World\nhello.txt:3:Hello Universe",
 			wantErr: false,
 		},
 		{
@@ -99,9 +96,4 @@ func TestGrep_Execute(t *testing.T) {
 			}
 		})
 	}
-}
-
-func hasCommand(cmd, path string) bool {
-	// Simplified check, in reality exec.LookPath is better
-	return true // Assume true if we got this far in CI environment, or skip logic above handles it
 }

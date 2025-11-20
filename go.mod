@@ -1,12 +1,13 @@
 module giai
 
 go 1.24.0
-
 toolchain go1.24.10
+
 
 require (
 	github.com/google/generative-ai-go v0.20.1
 	github.com/sashabaranov/go-openai v1.22.0
+	github.com/bmatcuk/doublestar/v4 v4.9.1
 	google.golang.org/api v0.256.0
 )
 
@@ -17,7 +18,6 @@ require (
 	cloud.google.com/go/auth/oauth2adapt v0.2.8 // indirect
 	cloud.google.com/go/compute/metadata v0.9.0 // indirect
 	cloud.google.com/go/longrunning v0.5.7 // indirect
-	github.com/bmatcuk/doublestar/v4 v4.9.1 // indirect
 	github.com/felixge/httpsnoop v1.0.4 // indirect
 	github.com/go-logr/logr v1.4.3 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect

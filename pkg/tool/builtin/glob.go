@@ -5,14 +5,22 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	_ "strings"
 	"time"
 
 	"giai/pkg/tool"
+	"github.com/bmatcuk/doublestar/v4"
 )
 
 type Glob struct {
 	tool.BaseTool
+}
+
+// GlobResult keeps output shape stable even when truncating results.
+type GlobResult struct {
+	Matches      []string `json:"matches"`
+	TotalMatches int      `json:"total_matches"`
+	Truncated    bool     `json:"truncated,omitempty"`
+	Warning      string   `json:"warning,omitempty"`
 }
 
 func NewGlob() *Glob {
@@ -102,13 +110,16 @@ func (t *Glob) Execute(ctx context.Context, input map[string]any, tc *tool.ToolC
 
 	// Limit results to avoid context overflow
 	const maxResults = 1000
-	if len(finalMatches) > maxResults {
-		return map[string]any{
-			"matches":       finalMatches[:maxResults],
-			"total_matches": len(finalMatches),
-			"warning":       fmt.Sprintf("Too many matches, truncated to %d", maxResults),
-		}, nil
+	result := &GlobResult{
+		TotalMatches: len(finalMatches),
+		Matches:      finalMatches,
 	}
 
-	return finalMatches, nil
+	if len(finalMatches) > maxResults {
+		result.Matches = finalMatches[:maxResults]
+		result.Truncated = true
+		result.Warning = fmt.Sprintf("Too many matches, truncated to %d", maxResults)
+	}
+
+	return result, nil
 }

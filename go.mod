@@ -8,6 +8,7 @@ require (
 	github.com/google/generative-ai-go v0.20.1
 	github.com/sashabaranov/go-openai v1.22.0
 	github.com/bmatcuk/doublestar/v4 v4.9.1
+	github.com/fsnotify/fsnotify v1.7.0
 	google.golang.org/api v0.256.0
 )
 

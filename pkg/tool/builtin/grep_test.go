@@ -28,7 +28,14 @@ func TestGrep_Execute(t *testing.T) {
 	f2 := filepath.Join(tmpDir, "other.txt")
 	os.WriteFile(f2, []byte("Nothing here"), 0644)
 
-	g := NewGrep()
+	gTool, err := NewGrep(nil)
+	if err != nil {
+		t.Fatalf("NewGrep() error = %v", err)
+	}
+	g, ok := gTool.(*Grep)
+	if !ok {
+		t.Fatalf("NewGrep() did not return *Grep, got %T", gTool)
+	}
 	ctx := context.Background()
 	tc := tool.NewToolContext()
 

@@ -31,6 +31,13 @@ func WithModel(m string) Option {
 	}
 }
 
+// WithTools attaches tool definitions for tool-calling capable models.
+func WithTools(tools []types.ToolDefinition) Option {
+	return func(o *ChatOptions) {
+		o.Tools = tools
+	}
+}
+
 // ChatChunk represents a piece of a streamed response.
 type ChatChunk struct {
 	Content      string

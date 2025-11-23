@@ -15,7 +15,9 @@ type Grep struct {
 	tool.BaseTool
 }
 
-func NewGrep() *Grep {
+// NewGrep 创建 grep 工具。
+// 与 agentsdk 的工厂模式保持一致：接受 config 并返回 (tool.Tool, error)，当前实现忽略 config。
+func NewGrep(config map[string]any) (tool.Tool, error) {
 	t := &Grep{
 		BaseTool: tool.NewBaseTool(
 			"grep",
@@ -52,7 +54,7 @@ func NewGrep() *Grep {
 		"required": []string{"pattern"},
 	}
 
-	return t
+	return t, nil
 }
 
 func (t *Grep) Execute(ctx context.Context, input map[string]any, tc *tool.ToolContext) (any, error) {

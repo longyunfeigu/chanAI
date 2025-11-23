@@ -2,6 +2,8 @@ package tool
 
 import (
 	"context"
+
+	"giai/pkg/sandbox"
 )
 
 // ToolContext carries metadata and services for tool execution.
@@ -18,8 +20,9 @@ type ToolContext struct {
 	Metadata map[string]any
 
 	// Services (Interfaces for loose coupling)
-	Logger  Logger
-	Storage Storage
+	Logger   Logger
+	Storage  Storage
+	Sandbox  sandbox.Sandbox
 }
 
 // Logger interface to avoid heavy dependencies
@@ -64,5 +67,14 @@ func WithSessionID(id string) Option {
 func WithLogger(l Logger) Option {
 	return func(tc *ToolContext) {
 		tc.Logger = l
+	}
+}
+
+// WithSandbox injects a sandbox into the ToolContext so tools can interact
+// with the filesystem and shell via a safe abstraction instead of touching
+// the host system directly.
+func WithSandbox(s sandbox.Sandbox) Option {
+	return func(tc *ToolContext) {
+		tc.Sandbox = s
 	}
 }

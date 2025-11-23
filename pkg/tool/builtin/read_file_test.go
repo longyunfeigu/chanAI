@@ -11,7 +11,7 @@ import (
 
 func TestReadFile_Execute(t *testing.T) {
 	// Create a temporary file for testing
-	tmpContent := "Hello, Giai!"
+	tmpContent := "line1\nline2\nline3\nline4"
 	tmpFile, err := os.CreateTemp("", "giai_test_*.txt")
 	if err != nil {
 		t.Fatalf("Failed to create temp file: %v", err)
@@ -24,33 +24,51 @@ func TestReadFile_Execute(t *testing.T) {
 	tmpFile.Close()
 	absPath, _ := filepath.Abs(tmpFile.Name())
 
-	rf := NewReadFile()
+	rf, err := NewReadFile(nil)
+	if err != nil {
+		t.Fatalf("NewReadFile() error = %v", err)
+	}
 	ctx := context.Background()
 	tc := tool.NewToolContext()
 
 	tests := []struct {
-		name    string
-		input   map[string]any
-		want    string
-		wantErr bool
+		name        string
+		input       map[string]any
+		wantContent string
+		wantOK      bool
+		wantErr     bool
 	}{
 		{
-			name:    "Valid Read",
-			input:   map[string]any{"path": absPath},
-			want:    tmpContent,
-			wantErr: false,
+			name:        "Valid Read Full",
+			input:       map[string]any{"path": absPath},
+			wantContent: tmpContent,
+			wantOK:      true,
+			wantErr:     false,
 		},
 		{
-			name:    "Relative Path Error",
-			input:   map[string]any{"path": "relative/path.txt"},
-			want:    "",
-			wantErr: true,
+			name: "Offset And Limit",
+			input: map[string]any{
+				"path":   absPath,
+				"offset": 1,
+				"limit":  2,
+			},
+			wantContent: "line2\nline3",
+			wantOK:      true,
+			wantErr:     false,
 		},
 		{
-			name:    "Non-existent File",
-			input:   map[string]any{"path": filepath.Join(os.TempDir(), "non_existent_file_123.txt")},
-			want:    "",
-			wantErr: true,
+			name:        "Relative Path Not OK",
+			input:       map[string]any{"path": "relative/path.txt"},
+			wantContent: "",
+			wantOK:      false,
+			wantErr:     false,
+		},
+		{
+			name:        "Non-existent File Not OK",
+			input:       map[string]any{"path": filepath.Join(os.TempDir(), "non_existent_file_123.txt")},
+			wantContent: "",
+			wantOK:      false,
+			wantErr:     false,
 		},
 	}
 
@@ -61,13 +79,22 @@ func TestReadFile_Execute(t *testing.T) {
 				t.Errorf("Execute() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
-			if !tt.wantErr {
-				gotStr, ok := got.(string)
-				if !ok {
-					t.Errorf("Execute() returned non-string result")
-				}
-				if gotStr != tt.want {
-					t.Errorf("Execute() = %v, want %v", gotStr, tt.want)
+
+			// When no Go error is returned, we always expect a structured map result.
+			res, ok := got.(map[string]any)
+			if !ok {
+				t.Fatalf("Execute() expected map[string]any result, got %T", got)
+			}
+
+			okField, _ := res["ok"].(bool)
+			if okField != tt.wantOK {
+				t.Errorf("ok = %v, want %v", okField, tt.wantOK)
+			}
+
+			if tt.wantContent != "" {
+				content, _ := res["content"].(string)
+				if content != tt.wantContent {
+					t.Errorf("content = %q, want %q", content, tt.wantContent)
 				}
 			}
 		})

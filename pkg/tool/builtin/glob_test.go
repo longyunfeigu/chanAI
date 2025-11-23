@@ -27,7 +27,14 @@ func TestGlob_Execute(t *testing.T) {
 	createFile(t, filepath.Join(tmpDir, "sub", "b.go"))
 	createFile(t, filepath.Join(tmpDir, "sub", "c.js"))
 
-	g := NewGlob()
+	gTool, err := NewGlob(nil)
+	if err != nil {
+		t.Fatalf("NewGlob() error = %v", err)
+	}
+	g, ok := gTool.(*Glob)
+	if !ok {
+		t.Fatalf("NewGlob() did not return *Glob, got %T", gTool)
+	}
 	ctx := context.Background()
 	tc := tool.NewToolContext()
 

@@ -23,7 +23,9 @@ type GlobResult struct {
 	Warning      string   `json:"warning,omitempty"`
 }
 
-func NewGlob() *Glob {
+// NewGlob 创建 glob 工具。
+// 为与 agentsdk 工厂风格保持一致，这里接受 config 并返回 (tool.Tool, error)，当前实现忽略 config。
+func NewGlob(config map[string]any) (tool.Tool, error) {
 	t := &Glob{
 		BaseTool: tool.NewBaseTool(
 			"glob",
@@ -55,7 +57,7 @@ func NewGlob() *Glob {
 		"required": []string{"pattern"},
 	}
 
-	return t
+	return t, nil
 }
 
 func (t *Glob) Execute(ctx context.Context, input map[string]any, tc *tool.ToolContext) (any, error) {
